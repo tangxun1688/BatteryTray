@@ -1,21 +1,23 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- 本机只有 3.1 SDK，故按 3.1 编译；RollForward 让它在已装的 8.0/10.0 运行时上跑。
-         有 8.x SDK 时把 TargetFramework 改成 net8.0-windows 即可，其余代码不用动。 -->
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <RollForward>LatestMajor</RollForward>
+    <!-- 目标 .NET Framework 4.8：Windows 10 1903+ / Windows 11 系统自带，
+         运行机无需安装 .NET Core / .NET 运行时，单文件产物约 88KB。 -->
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>disable</Nullable>
     <AssemblyName>BatteryTray</AssemblyName>
     <RootNamespace>BatteryTray</RootNamespace>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <LangVersion>8.0</LangVersion>
+    <DebugType>none</DebugType>
+    <Deterministic>true</Deterministic>
+    <!-- 与原先 win-x64 产物保持一致：AnyCPU 下按 64 位运行 -->
+    <Prefer32Bit>false</Prefer32Bit>
+    <!-- 直接引用系统自带的 .NET Framework 程序集，离线可编译，无需 NuGet 参考程序集包 -->
+    <FrameworkPathOverride Condition="'$(FrameworkPathOverride)' == '' and Exists('C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorlib.dll')">C:\Windows\Microsoft.NET\Framework64\v4.0.30319</FrameworkPathOverride>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
   </PropertyGroup>
-
-  <!-- 本机 SDK 3.1 的 UseWindowsForms 未生效，需显式声明框架引用 -->
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
-  </ItemGroup>
 
 </Project>

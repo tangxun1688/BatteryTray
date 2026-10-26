@@ -868,6 +868,8 @@ internal sealed class TrayApp : IDisposable
         var m = System.Text.RegularExpressions.Regex.Match(json, "\"" + key + "\"\\s*:\\s*\\[([^\\]]*)\\]");
         if (!m.Success) return null;
         return System.Text.RegularExpressions.Regex.Matches(m.Groups[1].Value, "\"((?:[^\"\\\\]|\\\\.)*)\"")
+            // net48 的 MatchCollection 只实现非泛型 IEnumerable，需 Cast 后才能用 LINQ（netcoreapp3.1 亦兼容）
+            .Cast<System.Text.RegularExpressions.Match>()
             .Select(x => Unesc(x.Groups[1].Value)).ToList();
     }
 

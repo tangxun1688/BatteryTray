@@ -37,16 +37,19 @@ Windows 托盘工具：实时显示 2.4G 无线外设（鼠标 / 键盘 / 耳机
 
 ## 运行要求
 
-- Windows 10/11 x64
-- .NET Core 3.1+ 桌面运行时（本机装了任意更新的 .NET 运行时也可以，`RollForward` 会自动匹配）
+- Windows 10 1903+ / Windows 11（x64）
+- **不需要安装 .NET Core / .NET 运行时**：目标框架为 **.NET Framework 4.8**，Windows 10 1903 起与 Windows 11 均为系统自带（含更新的 4.8.1）
+- 单文件 exe（约 88KB），双击即用；更老的 Windows 10 1809 需自行安装 .NET Framework 4.8
 
 ## 构建
 
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish/fd-single
+dotnet build -c Release
 ```
 
-产物为单个 `BatteryTray.exe`（约 260KB，依赖本机 .NET 运行时）。需要免安装 portable 版可用 `--self-contained true`（约 156MB，内置运行时）。
+产物：`bin\Release\net48\BatteryTray.exe`，单文件约 **88KB**。
+
+编译直接引用系统自带的 .NET Framework 程序集（csproj 里的 `FrameworkPathOverride`），不需要下载 NuGet 参考程序集包，可离线编译。构建机需要任意版本的 .NET SDK；**运行机不需要任何 .NET Core / .NET 运行时**。
 
 ## 项目结构
 

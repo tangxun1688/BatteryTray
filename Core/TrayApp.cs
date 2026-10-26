@@ -238,7 +238,7 @@ internal sealed class TrayApp : IDisposable
         return ordered.FirstOrDefault(s => s.Reading.Ok) ?? ordered[0];
     }
 
-    private List<DeviceSlot> ApplyOrder(List<DeviceSlot> slots)
+    internal List<DeviceSlot> ApplyOrder(List<DeviceSlot> slots)
     {
         if (_order.Count == 0) return slots;
         var byName = slots.GroupBy(s => s.DisplayName)

@@ -412,16 +412,24 @@ internal sealed class PanelForm : Form
         if (IsDisposed) return;
         if (InvokeRequired) { try { BeginInvoke((Action)(() => ApplyReadings(slots))); } catch { } return; }
 
-        // 用户拖拽后的卡片顺序优先：按当前视觉顺序排 slots 再重建，
-        // 否则每轮扫描重建卡片会把拖拽结果冲掉。用 Key（稳定）而非 DisplayName
-        // （改名后会变）跟踪视觉顺序，避免改名后设备被排到队尾。
-        var visual = _flow.Controls.OfType<DeviceCard>().Select(c => c.Key).ToList();
-        if (visual.Count > 0)
-            slots = slots.OrderBy(s =>
-            {
-                var i = visual.IndexOf(s.Key);
-                return i < 0 ? int.MaxValue : i;
-            }).ToList();
+        // 面板与右键菜单/悬停提示共用同一套"托盘顺序"（_order）：先按它排，
+        // 保证三处显示顺序一致。此前面板首次打开（没有已有卡片）时回退到扫描
+        // 原始顺序，而菜单/悬停用的是保存的 _order，导致"重新打开后顺序不一致"。
+        // 仅拖拽进行中（_dragging）沿用当前视觉顺序，避免刷新把正在拖的卡片弹回。
+        if (_dragging)
+        {
+            var visual = _flow.Controls.OfType<DeviceCard>().Select(c => c.Key).ToList();
+            if (visual.Count > 0)
+                slots = slots.OrderBy(s =>
+                {
+                    var i = visual.IndexOf(s.Key);
+                    return i < 0 ? int.MaxValue : i;
+                }).ToList();
+        }
+        else
+        {
+            slots = _app?.ApplyOrder(slots) ?? slots;
+        }
 
         _flow.SuspendLayout();
         _flow.Controls.Clear();

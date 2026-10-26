@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- 本机只有 3.1 SDK，故按 3.1 编译；RollForward 让它在已装的 8.0/10.0 运行时上跑。
+         有 8.x SDK 时把 TargetFramework 改成 net8.0-windows 即可，其余代码不用动。 -->
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
+    <Nullable>disable</Nullable>
+    <AssemblyName>BatteryTray</AssemblyName>
+    <RootNamespace>BatteryTray</RootNamespace>
+    <Version>1.0.0</Version>
+    <LangVersion>8.0</LangVersion>
+  </PropertyGroup>
+
+  <!-- 本机 SDK 3.1 的 UseWindowsForms 未生效，需显式声明框架引用 -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+  </ItemGroup>
+
+</Project>

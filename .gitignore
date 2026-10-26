@@ -1,0 +1,18 @@
+# 构建产物
+bin/
+obj/
+publish/
+dist/
+out/
+
+# 开发期的渲染验证图
+render_*.png
+
+# IDE / 用户配置
+*.user
+*.suo
+.vs/
+.idea/
+
+# 运行期生成
+*.log

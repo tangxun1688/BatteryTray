@@ -31,7 +31,7 @@ Windows 托盘工具：实时显示 2.4G 无线外设（鼠标 / 键盘 / 耳机
 |---|---|---|---|
 | Logitech G Pro X Superlight 2 | LIGHTSPEED 接收器 / 有线 / 蓝牙 | ✅ HID++ 2.0 UnifiedBattery | ✅ |
 | ASUS ROG 夜魔（Azoth 75%，OMNI 接收器） | ROG OMNI 接收器 | ✅ 厂商 HID 协议 | ✅ |
-| SteelSeries Arctis 1 Wireless | 2.4G USB dongle | ✅ 厂商 HID 协议 | ⚠️ 协议无充电位，按电量趋势推断 |
+| SteelSeries Arctis 1 Wireless | 2.4G USB dongle | ✅ 厂商 HID 协议 | ✅ 端电压判定（充电≥4100mV） |
 
 协议探测对未适配的 HID 设备做了通用枚举尝试，遇到新设备可按 `Hid.cs` / `Devices.cs` 的 Provider 模式扩展。
 
@@ -55,7 +55,7 @@ dotnet build -c Release
 
 ```
 BatteryTray/
-├── Program.cs        入口与运行模式（托盘 / --panel / --shot / --render / --once / --probe）
+├── Program.cs        入口与运行模式（默认=托盘常驻；--probe=诊断 HID；--shot/--render/--icon=导出预览图；--menu=自验；--once[--raw]=单次扫描；--install-startup/--remove-startup=开机自启；--debug=调试日志）
 ├── Core/             应用层
 │   ├── TrayApp.cs    托盘主逻辑：菜单、刷新循环、设置、固定/重命名
 │   ├── AutoStart.cs  开机自启（HKCU Run）

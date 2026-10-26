@@ -9,7 +9,7 @@
     <Nullable>disable</Nullable>
     <AssemblyName>BatteryTray</AssemblyName>
     <RootNamespace>BatteryTray</RootNamespace>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <LangVersion>8.0</LangVersion>
     <DebugType>none</DebugType>
     <Deterministic>true</Deterministic>

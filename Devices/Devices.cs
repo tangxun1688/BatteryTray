@@ -10,53 +10,33 @@ internal sealed class Reading
     public int? Level;          // null = 读不到
     public bool? Charging;      // null = 该协议不上报充电状态（不猜）
     public bool Offline;        // 设备关机 / 未连接
-    public string Note = "";    // 给人看的状态说明
-    public string Status = "";  // 有电量时覆盖默认文案（如"已充满"）
+    public string Note = "";    // 诊断说明（UI 不再显示，统一三态；--probe/日志用）
+    public string Status = "";  // 协议细状态（如"已充满"），仅诊断保留，UI 不再显示
     public string Raw = "";     // 原始报文（调试用，hex）
     public string Source = "";  // 协议出处
 
     public bool Ok => Level.HasValue;
 
+    /// <summary>
+    /// 界面统一三态：使用中 / 充电中 / 休眠中。
+    /// 离线、无应答、NAK、读不到电量等一律归为"休眠中"，卡片上不再展开长说明
+    /// （用户反馈：长句与其它卡片割裂）。详细原因仍在 Note / Raw 里，供 --probe 排查。
+    /// </summary>
     public string StatusText
     {
         get
         {
-            if (Offline) return "未连接";
-            if (!Level.HasValue) return string.IsNullOrEmpty(Note) ? "读取失败" : Note;
-            if (!string.IsNullOrEmpty(Status)) return Status;
+            if (Offline || !Level.HasValue) return "休眠中";
             if (Charging == true) return "充电中";
             return "使用中";
         }
     }
 
-    /// <summary>面板/托盘/控制台通用的一行状态（含"充电状态未知"后缀）。</summary>
-    public string StatusLine => Ok && Charging == null && string.IsNullOrEmpty(Status)
-        ? StatusText + "（充电状态未知）"
-        : StatusText;
+    /// <summary>面板/托盘/控制台通用的一行状态（三态，无后缀）。</summary>
+    public string StatusLine => StatusText;
 
-    /// <summary>
-    /// 悬停 tooltip / 右键菜单用的超短状态。长 Note（如 NAK 的完整说明）只留给
-    /// 面板卡片——tooltip 是纯文本，长句会把整行撑爆还破坏列对齐（用户反馈）。
-    /// </summary>
-    public string ShortStatus
-    {
-        get
-        {
-            if (Offline) return "未连接";
-            if (!Level.HasValue)
-            {
-                var n = Note ?? "";
-                if (n.Contains("未就绪") || n.Contains("NAK")) return "休眠中";
-                if (n.Contains("无应答")) return "无应答";
-                if (n.Contains("不支持")) return "不支持";
-                if (n.Contains("粗档位")) return "仅档位";
-                return "读取失败";
-            }
-            if (!string.IsNullOrEmpty(Status)) return Status;
-            if (Charging == true) return "充电中";
-            return "使用中";
-        }
-    }
+    /// <summary>悬停 tooltip / 右键菜单用的超短状态（与卡片同一套三态）。</summary>
+    public string ShortStatus => StatusText;
 }
 
 internal interface IDeviceProvider
@@ -353,7 +333,12 @@ internal sealed class SteelSeriesProvider : IDeviceProvider
     public string TypeLabel => "Headset";
 
     private const ushort VID = 0x1038;
-    private static readonly ushort[] Pids = { 0x12B3, 0x12B6, 0x12D7, 0x12D5 };
+
+    // 不用静态数组：本机 net48 构建下该数组在进程启动时前 3 个元素就是垃圾值
+    // （反射实测 01EB,0000,E0FF,12D5，且每次进程不同），导致 Match 永远 false、
+    // Arctis 时有时无。改成显式比较，绕开这个静态数组初始化异常。
+    private static bool IsKnownPid(ushort pid) =>
+        pid == 0x12B3 || pid == 0x12B6 || pid == 0x12D7 || pid == 0x12D5;
 
     // 趋势检测状态（Providers 列表是 static 的，实例伴随托盘进程常驻）
     private int? _prevLevel;
@@ -361,7 +346,7 @@ internal sealed class SteelSeriesProvider : IDeviceProvider
     private bool? _charging;   // null = 尚无结论
 
     public bool Match(HidInterface d) =>
-        d.VendorId == VID && Array.IndexOf(Pids, d.ProductId) >= 0 &&
+        d.VendorId == VID && IsKnownPid(d.ProductId) &&
         d.UsagePage == 0xFF43 && d.Usage == 0x0202 && d.CanWrite;
 
     private static string Hex(byte[] b, int n)
@@ -486,10 +471,14 @@ internal sealed class DeviceManager
         var slots = new List<DeviceSlot>();
         var seen = new HashSet<string>();
 
-        using var devs = new CompositeDisposable();
-        foreach (var dev in HidEnum.EnumerateOpenable())
+        // 逐个打开、用完即关：不能把所有集合的句柄同时攥在手里。
+        // Arctis 1（1038:12B3）的 MI_03&COL02 控制集合，在 COL01/COL03 已被以读写方式
+        // 打开时会退化成只读（CanWrite=false），SteelSeriesProvider 就匹配不上，
+        // 表现为"有时能读到、有时整台设备消失"。--probe 单独打开每个集合可稳定读到。
+        foreach (var path in HidEnum.Paths())
         {
-            devs.Add(dev);
+            using var dev = HidInterface.TryOpen(path);
+            if (dev == null) continue;
             foreach (var p in Providers)
             {
                 if (!p.Match(dev)) continue;

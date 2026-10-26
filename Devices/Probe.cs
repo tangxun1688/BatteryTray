@@ -14,6 +14,11 @@ namespace BatteryTray
         public static int Run()
         {
             Console.OutputEncoding = Encoding.UTF8;
+
+            Console.WriteLine("=== Arctis 1 (1038:12B3) 接口诊断 ===");
+            Arctis();
+
+            Console.WriteLine();
             Console.WriteLine("=== 假设A：只开目标集合（同 Python 探针）===");
             Logitech(false);
             Omni(false, withProbe: false);
@@ -36,6 +41,45 @@ namespace BatteryTray
 
             foreach (var d in junk) d.Dispose();
             return 0;
+        }
+
+        /// <summary>
+        /// Arctis 1 专用：列出 1038:12B3 的所有 HID 集合，标出 usage/长度/写权限；
+        /// 对 0xFF43/0x0202 控制集合发 06 12 并 dump 原始应答。
+        /// 用来区分"枚举不到 / 只有只读权限 / 写通了但无应答 / 应答解析问题"。
+        /// </summary>
+        private static void Arctis()
+        {
+            foreach (var path in HidEnum.Paths())
+            {
+                var low = path.ToLowerInvariant();
+                if (low.IndexOf("vid_1038", StringComparison.Ordinal) < 0) continue;
+                if (low.IndexOf("pid_12b3", StringComparison.Ordinal) < 0) continue;
+
+                var rw = HidInterface.TryOpen(path, allowReadOnlyFallback: false);
+                var dev = rw ?? HidInterface.TryOpen(path, allowReadOnlyFallback: true);
+                if (dev == null)
+                {
+                    Console.WriteLine($"  [打不开] {Tail(path)}");
+                    continue;
+                }
+                Console.WriteLine($"  up=0x{dev.UsagePage:X4} usage=0x{dev.Usage:X4} " +
+                                  $"in={dev.InLen} out={dev.OutLen} canWrite={dev.CanWrite} {Tail(path)}");
+                if (dev.CanWrite && dev.UsagePage == 0xFF43 && dev.Usage == 0x0202)
+                {
+                    var req = new byte[dev.OutLen];
+                    req[0] = 0x06;
+                    req[1] = 0x12;
+                    Dump("06 12 ->", dev.Query(req, 1500), 16);
+                }
+                dev.Dispose();
+            }
+        }
+
+        private static string Tail(string path)
+        {
+            var i = path.IndexOf("#vid_", StringComparison.OrdinalIgnoreCase);
+            return i < 0 ? path : path.Substring(i + 1);
         }
 
         private static void Dump(string tag, byte[] r, int n = 12)

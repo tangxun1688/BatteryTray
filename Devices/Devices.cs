@@ -316,13 +316,13 @@ internal sealed class AsusOmniProvider : IDeviceProvider
 ///        （同接口 col03 的 0xFF00/0x0001 写入报 ERROR_INVALID_FUNCTION，不能用）
 ///   请求 06 12；响应 06 12 &lt;status&gt; &lt;level&gt; ...
 ///
-/// 充电识别（2026-10-26 复测定案）：
-///   - 该型号的 06 12 应答**不包含充电状态**：83% 时充电与未充电的整包完全相同
-///     （06 12 03 53 00 C0-C2 0F ...），byte[5] 不是充电标志（更像电压/信号类数值）。
-///   - HeadsetControl 把 charging_value 设为 0xFF 哨兵（注释 "no charging for this device"）；
-///     Linux hid-steelseries-arctis.c 也不解析该型号的充电。
-///   - 因此不再猜测：Charging 恒为 null，UI 显示"使用中"；只有离线/无应答才显示"休眠中"。
-///   - 原始报文仍可在 --raw / --probe 查看。
+/// 充电识别（2026-10-26 22:59 实测定案）：
+///   resp[5..6] 是**电池端电压**（小端 16 位，单位 mV），不是之前误判的“电流量级”：
+///     未充电 83%：0x0FC0-0x0FC1 = 4032-4033 mV
+///     充电中 83%：0x1052-0x1054 = 4178-4180 mV（充电器把端电压抬高约 150mV）
+///   判据：端电压 ≥ 4100 mV → 充电中；否则使用中；离线/无应答 → 休眠中。
+///   低电量恒流阶段电压可能低于 4100（后续可按电量做动态阈值），届时会显示使用中。
+///   原始报文仍可在 --raw / --probe 查看。
 /// </summary>
 internal sealed class SteelSeriesProvider : IDeviceProvider
 {
@@ -399,12 +399,11 @@ internal sealed class SteelSeriesProvider : IDeviceProvider
         }
         r.Level = level;
 
-        // ---- 充电状态：该协议不提供，不再猜测 ----
-        // 实测 2026-10-26：83% 时充电与未充电的整包完全相同
-        //   （06 12 03 53 00 C0-C2 0F ...），byte[5] 不是充电标志。
-        // HeadsetControl 用 0xFF 哨兵声明该型号无充电；Linux 驱动同样不解析。
-        // Charging 保持 null → UI 显示"使用中"；离线/无应答才显示"休眠中"。
-        r.Charging = null;
+        // ---- 充电状态：resp[5..6] 是端电压（小端 16 位，mV）----
+        // 未充电 83%: 0x0FC0-0x0FC1 = 4032-4033 mV；充电中 83%: 0x1052-0x1054 = 4178-4180 mV。
+        // 之前把 resp[5] 单独当“电流量级”、≥100 判充电，方向正好反了，才出现“没充电却显示充电中”。
+        int mv = resp.Length >= 7 ? (resp[5] | (resp[6] << 8)) : 0;
+        r.Charging = mv > 0 ? (bool?)(mv >= 4100) : null;
         return r;
     }
 }

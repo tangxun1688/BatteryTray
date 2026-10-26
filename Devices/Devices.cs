@@ -316,15 +316,13 @@ internal sealed class AsusOmniProvider : IDeviceProvider
 ///        （同接口 col03 的 0xFF00/0x0001 写入报 ERROR_INVALID_FUNCTION，不能用）
 ///   请求 06 12；响应 06 12 &lt;status&gt; &lt;level&gt; ...
 ///
-/// 充电识别（2026-10-26 三轮抓包定案）：
-///   1) 状态字节 [2] 不是充电标志：插拔全程恒 0x03（离线时 0x01），已废弃位域推断。
-///   2) RaskiTech/arctis-battery-indicator 给的 charging_status_idx=4 不适用：
-///      它读的是 0-4 粗档位电量的旧固件；本设备 [4] 恒 0x00（整包 8-15 字节全 0）。
-///   3) **byte[5] = 电流量级(mA)，是本设备的充电判据**：放电 14-54、充电 130-228，
-///      插拔一次采样内跳变；充电时随电量上升回落（228@91% → 130@99%，恒压限流收敛）。
-///      → 分段判定：≥100 充电、≤60 放电、中间带回落到电量趋势（防高负载放电误判）。
-///   4) 电量趋势作为兜底（涨=充电/跌=放电，180s 窗口、离线清状态）。
-///   全是经验映射（上游一致声明该型号不上报充电），原始报文在 --raw 可见。
+/// 充电识别（2026-10-26 复测定案）：
+///   - 该型号的 06 12 应答**不包含充电状态**：83% 时充电与未充电的整包完全相同
+///     （06 12 03 53 00 C0-C2 0F ...），byte[5] 不是充电标志（更像电压/信号类数值）。
+///   - HeadsetControl 把 charging_value 设为 0xFF 哨兵（注释 "no charging for this device"）；
+///     Linux hid-steelseries-arctis.c 也不解析该型号的充电。
+///   - 因此不再猜测：Charging 恒为 null，UI 显示"使用中"；只有离线/无应答才显示"休眠中"。
+///   - 原始报文仍可在 --raw / --probe 查看。
 /// </summary>
 internal sealed class SteelSeriesProvider : IDeviceProvider
 {
@@ -340,10 +338,7 @@ internal sealed class SteelSeriesProvider : IDeviceProvider
     private static bool IsKnownPid(ushort pid) =>
         pid == 0x12B3 || pid == 0x12B6 || pid == 0x12D7 || pid == 0x12D5;
 
-    // 趋势检测状态（Providers 列表是 static 的，实例伴随托盘进程常驻）
-    private int? _prevLevel;
-    private DateTime _prevTime = DateTime.MinValue;
-    private bool? _charging;   // null = 尚无结论
+    // 该型号不上报充电状态（见类注释），无需趋势状态字段。
 
     public bool Match(HidInterface d) =>
         d.VendorId == VID && IsKnownPid(d.ProductId) &&
@@ -382,8 +377,6 @@ internal sealed class SteelSeriesProvider : IDeviceProvider
         {
             r.Offline = true;
             r.Note = "耳机关机或超出范围";
-            _prevLevel = null;   // 离线期间的电量没有连续性，清掉防复电时误判趋势
-            _charging = null;
             return r;
         }
 
@@ -400,41 +393,18 @@ internal sealed class SteelSeriesProvider : IDeviceProvider
             {
                 r.Offline = true;
                 r.Note = "耳机关机或超出范围";
-                _prevLevel = null;
-                _charging = null;
                 return r;
             }
             if (level > 100) { r.Note = "电量值越界"; return r; }
         }
         r.Level = level;
 
-        // ---- 充电判定（双信号）----
-        // A. 电流字节 [5]（2026-10-26 三轮抓包 40+ 样本的经验映射，上游未定义）：
-        //    放电 14-54（0x0E-0x36）、充电 130-228（0x82-0xE4）；
-        //    插线后一次采样内 0x0E→0x84、拔线后 0x84→0x16（瞬时跳变）；
-        //    且充电时随电量上升而回落（228@91% → 130@99%），符合恒压阶段限流收敛
-        //    → 大概率是电流量级(mA)。此前"电压(mV)"的判断已更正：[5][6] 与电量不单调相关。
-        // B. 电量趋势（涨=充电/跌=放电）作为 [5] 落在中间带（61-99）时的兜底，
-        //    只在托盘常驻模式有意义（--once 每次新进程无历史）。
-        int cur = resp.Length > 5 ? resp[5] : 0;
-        var now = DateTime.Now;
-        if (cur >= 100)
-        {
-            _charging = true;               // 明确在充：不等电量涨，一次读取就判定
-        }
-        else if (cur <= 60)
-        {
-            _charging = false;              // 明确在放
-        }
-        else if (_prevLevel.HasValue && (now - _prevTime).TotalSeconds < 180)
-        {
-            // 中间带（放电但负载偏高）：回落到趋势判定
-            if (level > _prevLevel.Value) _charging = true;
-            else if (level < _prevLevel.Value) _charging = false;
-        }
-        _prevLevel = level;
-        _prevTime = now;
-        r.Charging = _charging;
+        // ---- 充电状态：该协议不提供，不再猜测 ----
+        // 实测 2026-10-26：83% 时充电与未充电的整包完全相同
+        //   （06 12 03 53 00 C0-C2 0F ...），byte[5] 不是充电标志。
+        // HeadsetControl 用 0xFF 哨兵声明该型号无充电；Linux 驱动同样不解析。
+        // Charging 保持 null → UI 显示"使用中"；离线/无应答才显示"休眠中"。
+        r.Charging = null;
         return r;
     }
 }

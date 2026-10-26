@@ -58,6 +58,11 @@ internal sealed class DeviceCard : Control
 
     protected override void OnPaint(PaintEventArgs e)
     {
+        var g = e.Graphics;
+        // 【防乱码】同 DarkCheckBox：先铺满整个表面再画圆角卡片，
+        // 防止共享双缓冲残留内容从四角/未失效区域漏出
+        using (var b = new SolidBrush(BackColor))
+            g.FillRectangle(b, 0, 0, Width, Height);
         BatteryUI.DrawDeviceCard(e.Graphics, new Rectangle(0, 0, Width, Height),
             _name, _source, _ok && !_offline ? _level : (int?)null, _offline, _charging, _status, _pinned);
         base.OnPaint(e);
@@ -79,6 +84,9 @@ internal sealed class RoundedCard : Panel
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
+        // 【防乱码】同 DarkCheckBox：先铺满整个表面
+        using (var b = new SolidBrush(BackColor))
+            g.FillRectangle(b, 0, 0, Width, Height);
         using (var path = BatteryUI.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), 10))
         using (var b = new SolidBrush(BatteryUI.CardBg))
             g.FillPath(b, path);
@@ -100,14 +108,24 @@ internal sealed class DarkCheckBox : CheckBox
         Size = new Size(96, 26);
         ForeColor = BatteryUI.TextLight;
         Cursor = Cursors.Hand;
-        // 全自绘：不调 base.OnPaint，原生白色勾选框样式不会出现
+        // 全自绘，且 OnPaint 里必须显式铺满全表面（.NET Core 3.1 共享双缓冲残留
+        // 问题，见 OnPaint 注释）。不能加 SupportsTransparentBackColor——透明模拟
+        // 绘制路径在此框架上行为异常；BackColor 本就是不透明 FormBg，也用不着。
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
-                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
+        // 【防乱码关键】必须先铺满整个表面。.NET Core 3.1 的 OptimizedDoubleBuffer
+        // 共享缓冲在"局部失效重绘"时会把缓冲里上一个控件（按钮/设备卡片）的残留
+        // 内容整块 blit 到本控件区域——实测表现为"开机自启"一行叠着"立即刷新"
+        // 文字和卡片残影（2026-10-26 绿色填充定位实验实锤：OnPaint 显式全表面
+        // 填充后乱码立即消失）。只依赖 OnPaintBackground 兜底不够：它只填
+        // e.ClipRectangle，局部失效时缓冲其余部分是别人的残留。
+        using (var b = new SolidBrush(BatteryUI.FormBg))
+            g.FillRectangle(b, 0, 0, Width, Height);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 

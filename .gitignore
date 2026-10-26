@@ -16,3 +16,5 @@ render_*.png
 
 # 运行期生成
 *.log
+render_*.png
+shot_panel_ui.png

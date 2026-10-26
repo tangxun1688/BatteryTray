@@ -31,6 +31,29 @@ internal static class Program
             AllocConsole();
             return Probe.Run();
         }
+        if (args.Contains("--shot"))
+        {
+            // 离屏截取真实面板（README 产品图）：DrawToBitmap 不走屏幕，无遮挡/无缩放问题
+            AllocConsole();
+            try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            using var panel = new PanelForm(null);
+            panel.StartPosition = FormStartPosition.Manual;
+            panel.Location = new Point(-20000, -20000);   // 排到屏幕外，瞬显也不打扰
+            panel.ApplyReadings(DeviceManager.Scan());
+            panel.Show();
+            Application.DoEvents();
+            Thread.Sleep(400);                            // 等首帧绘制/扫描回调落定
+            Application.DoEvents();
+            using (var bmp = new Bitmap(panel.Width, panel.Height))
+            {
+                panel.DrawToBitmap(bmp, new Rectangle(0, 0, panel.Width, panel.Height));
+                bmp.Save("shot_panel_ui.png", System.Drawing.Imaging.ImageFormat.Png);
+            }
+            Console.WriteLine("shot_panel_ui.png saved");
+            return 0;
+        }
         if (args.Contains("--panel"))
         {
             Application.EnableVisualStyles();
@@ -117,7 +140,7 @@ internal static class Program
             using (var strip2 = new Bitmap(300, 30 * rows.Length))
             using (var g = Graphics.FromImage(strip2))
             {
-                g.Clear(Color.White);
+                g.Clear(BatteryUI.FormBg);   // 深色菜单底（浅色文字在白底上不可读）
                 for (var i = 0; i < rows.Length; i++)
                     BatteryUI.DrawDeviceRow(g, new Rectangle(33, i * 30, 267, 30),
                         rows[i].DisplayName, rows[i].Reading.Level, rows[i].Reading.Offline,

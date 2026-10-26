@@ -222,18 +222,12 @@ internal sealed class PanelForm : Form
             _app?.SetOrder(_flow.Controls.OfType<DeviceCard>().Select(c => c.DisplayName));
         Controls.Add(_flow);
 
-        // ---------- 设置卡片（与设备卡片同一套圆角深色视觉，操作项全部收进卡片） ----------
-        var group = new RoundedCard
+        // ---------- 设置区（不用卡片：卡片只留给设备展示） ----------
+        // 第 1 行：刷新间隔 + 下拉框 ｜ 立即刷新（右对齐）
+        Controls.Add(new Label
         {
-            Location = new Point(16, 346),
-            Size = new Size(368, 96),
-        };
-
-        // 第 1 行：刷新间隔 + 下拉框
-        group.Controls.Add(new Label
-        {
-            Text = "刷新间隔", AutoSize = true, Location = new Point(18, 15),
-            ForeColor = BatteryUI.TextLight, BackColor = BatteryUI.CardBg,
+            Text = "刷新间隔", AutoSize = true, Location = new Point(18, 353),
+            ForeColor = BatteryUI.TextLight,
         });
         _interval.DropDownStyle = ComboBoxStyle.DropDownList;
         _interval.DrawMode = DrawMode.OwnerDrawFixed;
@@ -241,7 +235,7 @@ internal sealed class PanelForm : Form
         _interval.BackColor = BatteryUI.CtrlBg;
         _interval.ForeColor = BatteryUI.TextLight;
         _interval.Items.AddRange(new object[] { "30 秒", "60 秒", "2 分钟", "5 分钟", "30 分钟" });
-        _interval.Location = new Point(100, 11);
+        _interval.Location = new Point(100, 348);
         _interval.Size = new Size(112, 24);
         // 原生下拉列表是系统色，owner-draw 才能压住深色底
         _interval.DrawItem += (s, e) =>
@@ -261,37 +255,38 @@ internal sealed class PanelForm : Form
                 0 => 30, 1 => 60, 2 => 120, 3 => 300, _ => 1800
             });
         };
-        group.Controls.Add(_interval);
+        Controls.Add(_interval);
 
-        // 第 2 行：立即刷新 ｜ 开机自启（自绘深色复选框）｜ 最小化
+        // 操作按钮统一定宽、右对齐到 x=368（左列只放设置控件，与按钮间隔 50px+，缩放也不重叠）
         _refresh.Text = "立即刷新";
-        _refresh.Location = new Point(18, 52);
-        _refresh.Size = new Size(90, 26);
+        _refresh.Location = new Point(280, 347);
+        _refresh.Size = new Size(88, 26);
         StyleButton(_refresh);
         _refresh.Click += (s, e) => _app?.RequestRefresh();
-        group.Controls.Add(_refresh);
+        Controls.Add(_refresh);
 
-        _autoStart.Location = new Point(122, 52);
+        // 第 2 行：开机自启（自绘深色复选框）｜ 最小化（右对齐）
+        _autoStart.Location = new Point(18, 390);
+        _autoStart.BackColor = BatteryUI.FormBg;
         _autoStart.CheckedChanged += (s, e) =>
         {
             if (_syncing) return;
             _app?.SetAutoStart(_autoStart.Checked);
         };
-        group.Controls.Add(_autoStart);
+        Controls.Add(_autoStart);
 
         _min.Text = "最小化";
-        _min.Location = new Point(262, 52);
-        _min.Size = new Size(90, 26);
+        _min.Location = new Point(280, 389);
+        _min.Size = new Size(88, 26);
         StyleButton(_min);
         _min.Click += (s, e) => WindowState = FormWindowState.Minimized;
-        group.Controls.Add(_min);
-        Controls.Add(group);
+        Controls.Add(_min);
 
         // ---------- 底部状态栏 ----------
         _updated.AutoSize = true;
         _updated.Font = new Font("Segoe UI", 8.5f);
         _updated.ForeColor = BatteryUI.TextDim;
-        _updated.Location = new Point(18, 452);
+        _updated.Location = new Point(18, 442);
         _updated.Text = "上次更新 --";
         Controls.Add(_updated);
 

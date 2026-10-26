@@ -2,12 +2,26 @@
 
 Windows 托盘工具：实时显示 2.4G 无线外设（鼠标 / 键盘 / 耳机）的电量与充电状态，纯 WinForms 自绘深色 UI，无第三方依赖。
 
+## 截图
+
+**主面板**（设备卡片 + 底部设置区）：
+
+![主面板](docs/images/panel.png)
+
+**右键菜单**（深色统一渲染，固定设备与开机自启同一枚浅色对勾）：
+
+![右键菜单](docs/images/menu.png)
+
+**托盘图标**（电量进度环，16px / 32px 双尺寸原生渲染）：
+
+![托盘图标](docs/images/tray-icons.png)
+
 ## 功能
 
 - **托盘图标**：直接把当前选中设备的电量画在托盘图标上（可固定某台设备，或自动选择）。
 - **右键菜单**：设备列表（名称 + 四色电池：绿 ≥60 / 黄 20-59 / 红 <20 / 蓝=充电中 / 灰=离线）、打开面板、立即刷新、开机自启、退出；全套深色自绘渲染器，与悬停提示、面板同一套视觉。
 - **悬浮提示**：鼠标悬停托盘图标，列出全部设备电量。
-- **面板**：设备卡片（大号百分比 + 全宽电量条 + 状态行），双击重命名、右键固定到托盘图标、按住拖动调整托盘顺序；底部设置卡片：刷新间隔 / 立即刷新 / 开机自启 / 最小化。
+- **面板**：设备卡片（大号百分比 + 全宽电量条 + 状态行），双击重命名、右键固定到托盘图标、按住拖动调整托盘顺序；底部设置区：刷新间隔 / 立即刷新 / 开机自启 / 最小化。
 - **改名永久保存**：设备以稳定硬件标识（VID:PID:UsagePage:Usage）为主键存于 `%APPDATA%\BatteryTray\settings.json`，重插 / 休眠重枚举后不丢。
 - **开机自启**：写入当前用户注册表 Run 项，无需管理员权限。
 
@@ -37,18 +51,22 @@ dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile
 ## 项目结构
 
 ```
-Program.cs      入口（托盘 / --panel / --menu 自验模式）
-TrayApp.cs      托盘主逻辑：菜单、刷新循环、设置、固定/重命名
-PanelForm.cs    面板窗体：设备卡片、拖拽排序、设置卡片、重命名对话框
-BatteryUI.cs    共享视觉件：配色阈值、电池图标、卡片/菜单行绘制
-MenuTheme.cs    右键菜单深色渲染器（ToolStripProfessionalRenderer 配色表）
-TipWindow.cs    鼠标悬停提示窗
-Devices.cs      设备 Provider 与扫描（Logitech / ASUS OMNI / SteelSeries）
-Hid.cs          HID 底层枚举与读写
-Probe.cs        HID 电量探测探针
-AutoStart.cs    开机自启（HKCU Run）
-Native.cs       Win32 API 声明
-SelfTest.cs     --menu 自验模式辅助
+BatteryTray/
+├── Program.cs        入口与运行模式（托盘 / --panel / --shot / --render / --once / --probe）
+├── Core/             应用层
+│   ├── TrayApp.cs    托盘主逻辑：菜单、刷新循环、设置、固定/重命名
+│   ├── AutoStart.cs  开机自启（HKCU Run）
+│   └── SelfTest.cs   --menu 自验模式辅助
+├── Devices/          设备与底层
+│   ├── Devices.cs    设备 Provider 与扫描（Logitech / ASUS OMNI / SteelSeries）
+│   ├── Hid.cs        HID 底层枚举与读写
+│   ├── Probe.cs      HID 电量探测探针
+│   └── Native.cs     Win32 API 声明
+└── UI/               界面层
+    ├── BatteryUI.cs  共享视觉件：配色阈值、电池图标、卡片/菜单行绘制
+    ├── PanelForm.cs  面板窗体：设备卡片、拖拽排序、设置区、重命名对话框
+    ├── MenuTheme.cs  右键菜单深色渲染器（ToolStripProfessionalRenderer 配色表）
+    └── TipWindow.cs  鼠标悬停提示窗
 ```
 
 ## 致谢（协议参考）
